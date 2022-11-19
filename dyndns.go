@@ -60,7 +60,7 @@ func (d *coredyndns) init() error {
 	return nil
 }
 
-func (d *coredyndns) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
+func (d coredyndns) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r}
 	qname := state.Name()
 
@@ -110,7 +110,7 @@ func (d *coredyndns) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.
 	return dns.RcodeSuccess, nil
 }
 
-func (d *coredyndns) Name() string { return "coredyndns" }
+func (d coredyndns) Name() string { return "coredyndns" }
 
 func (d *coredyndns) OnStartup() error {
 	ln, err := reuseport.Listen("tcp", d.listen)
