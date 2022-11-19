@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/coredns/coredns/plugin"
+	"github.com/coredns/coredns/plugin/pkg/log"
 	"github.com/coredns/coredns/plugin/pkg/reuseport"
 	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
@@ -51,6 +52,10 @@ func (d *coredyndns) init() error {
 	}
 	if (len(d.username) == 0) != (len(d.password) == 0) {
 		return errors.New("invalid auth configuration")
+	}
+	log.Infof("listening on %s", d.listen)
+	if len(d.zones) > 0 {
+		log.Infof("allowed zones: %+v\n", d.zones)
 	}
 	return nil
 }
@@ -145,8 +150,8 @@ func (d *coredyndns) OnStartup() error {
 		}
 		f := strings.Split(hostname, ".")
 		zone := strings.Join(f[1:], ".")
-		if len(d.zones) != 0 {
-			if !slices.Contains(d.zones, zone) {
+		if len(d.zones) > 0 {
+			if !slices.Contains(d.zones, dns.Fqdn(zone)) {
 				http.Error(w, "invalid zone", http.StatusBadRequest)
 				return
 			}
@@ -161,7 +166,8 @@ func (d *coredyndns) OnStartup() error {
 			http.Error(w, "invalid ip address", http.StatusBadRequest)
 			return
 		}
-		d.addDnsEntry(hostname, address)
+		log.Infof("dyndns update: %s - %s", hostname, address.String())
+		d.addDnsEntry(dns.Fqdn(hostname), address)
 	})
 
 	go func() { _ = http.Serve(d.ln, d.mux) }()
