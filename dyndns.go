@@ -64,8 +64,12 @@ func (d *coredyndns) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.
 	state := request.Request{W: w, Req: r}
 	qname := state.Name()
 
+	log.Infof("query: %s - %d", qname, state.QType())
+
 	answers := []dns.RR{}
 	zone := plugin.Zones(d.zones).Matches(qname)
+
+	log.Infof("q zone: %s", zone)
 
 	if zone == "" {
 		// PTR zones don't need to be specified in Origins.
@@ -76,8 +80,11 @@ func (d *coredyndns) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.
 	}
 	d.m.Lock()
 	defer d.m.Unlock()
+	log.Info("q lookup")
 	if entry, ok := d.entries[qname]; ok {
+		log.Infof("q %s exists", qname)
 		if addr, ok := entry[state.QType()]; ok {
+			log.Info("q type exists")
 			r := new(dns.A)
 			r.Hdr = dns.RR_Header{Name: zone, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 3600}
 			r.A = addr
@@ -85,10 +92,12 @@ func (d *coredyndns) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.
 		}
 	}
 
+	log.Info("q done")
 	if len(answers) == 0 {
+		log.Info("q not found")
 		return plugin.NextOrFailure(d.Name(), d.Next, ctx, w, r)
 	}
-
+	log.Info("q done write")
 	m := new(dns.Msg)
 	m.SetReply(r)
 	m.Authoritative = true
