@@ -6,7 +6,6 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -145,7 +144,6 @@ func (d *coredyndns) OnStartup() error {
 			return
 		}
 		f := strings.Split(hostname, ".")
-		host := f[0]
 		zone := strings.Join(f[1:], ".")
 		if len(d.zones) != 0 {
 			if !slices.Contains(d.zones, zone) {
@@ -158,14 +156,11 @@ func (d *coredyndns) OnStartup() error {
 			ip = myip
 		}
 
-		fmt.Printf("host: '%s', zone: '%s', ip: '%s'\n", host, zone, ip)
-
 		address := net.ParseIP(ip)
 		if address == nil {
 			http.Error(w, "invalid ip address", http.StatusBadRequest)
 			return
 		}
-		fmt.Printf("ip: %s\n", address.String())
 		d.addDnsEntry(hostname, address)
 	})
 
