@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"sync"
 
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/plugin/pkg/log"
@@ -27,7 +26,6 @@ type coredyndns struct {
 	Next plugin.Handler
 
 	entries map[string]dnsEntry
-	m       sync.Mutex
 
 	zones       []string
 	listen      string
@@ -60,7 +58,7 @@ func (d *coredyndns) init() error {
 	return nil
 }
 
-func (d *coredyndns) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
+func (d coredyndns) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r}
 	qname := state.Name()
 
@@ -78,8 +76,6 @@ func (d *coredyndns) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.
 			return plugin.NextOrFailure(d.Name(), d.Next, ctx, w, r)
 		}
 	}
-	d.m.Lock()
-	defer d.m.Unlock()
 	log.Info("q lookup")
 	if entry, ok := d.entries[qname]; ok {
 		log.Infof("q %s exists", qname)
@@ -110,7 +106,7 @@ func (d *coredyndns) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.
 	return dns.RcodeSuccess, nil
 }
 
-func (d *coredyndns) Name() string { return "coredyndns" }
+func (d coredyndns) Name() string { return "coredyndns" }
 
 func (d *coredyndns) OnStartup() error {
 	ln, err := reuseport.Listen("tcp", d.listen)
@@ -194,8 +190,6 @@ func (d *coredyndns) OnShutdown() error {
 }
 
 func (d *coredyndns) addDnsEntry(hostname string, address net.IP) {
-	d.m.Lock()
-	defer d.m.Unlock()
 	if _, ok := d.entries[hostname]; !ok {
 		d.entries[hostname] = make(dnsEntry)
 	}
