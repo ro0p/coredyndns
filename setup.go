@@ -48,8 +48,13 @@ func parse(c *caddy.Controller) (coredyndns, error) {
 	d := coredyndns{entries: make(map[string]dnsEntry), zones: []string{}}
 
 	for c.Next() {
-		for _, z := range c.RemainingArgs() {
-			d.zones = append(d.zones, dns.Fqdn(z))
+		args := c.RemainingArgs()
+		if len(args) == 0 {
+			d.zones = plugin.OriginsFromArgsOrServerBlock(args, c.ServerBlockKeys)
+		} else {
+			for _, z := range args {
+				d.zones = append(d.zones, dns.Fqdn(z))
+			}
 		}
 
 		for c.NextBlock() {
