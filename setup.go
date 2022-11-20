@@ -6,6 +6,7 @@ import (
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
+	"github.com/miekg/dns"
 )
 
 /*
@@ -42,10 +43,12 @@ func setup(c *caddy.Controller) error {
 
 func parse(c *caddy.Controller) (*coredyndns, error) {
 	var err error
-	d := &coredyndns{entries: make(map[string]dnsEntry)}
+	d := &coredyndns{entries: make(map[string]dnsEntry), zones: []string{}}
 
 	for c.Next() {
-		d.zones = plugin.OriginsFromArgsOrServerBlock(c.RemainingArgs(), c.ServerBlockKeys)
+		for _, z := range c.RemainingArgs() {
+			d.zones = append(d.zones, dns.Fqdn(z))
+		}
 
 		for c.NextBlock() {
 			switch c.Val() {
