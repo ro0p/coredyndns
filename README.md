@@ -1,5 +1,6 @@
 # coredyndns
 [![Go](https://github.com/ro0p/coredyndns/actions/workflows/go.yml/badge.svg)](https://github.com/ro0p/coredyndns/actions/workflows/go.yml)
+[![Docker Image CI](https://github.com/ro0p/coredyndns/actions/workflows/docker-image.yml/badge.svg)](https://github.com/ro0p/coredyndns/actions/workflows/docker-image.yml)
 
 Dynamic DNS plugin for [CoreDNS](https://github.com/coredns/coredns)
 
