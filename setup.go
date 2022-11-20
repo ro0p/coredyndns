@@ -12,7 +12,7 @@ import (
 
 /*
 coredyndns [zones...] {
-	listen :443 tls insecure | listen :80
+	listen :9080 [tls [insecure]]
 	cert file <filename>
 	key file <filename>
 	username <username>
