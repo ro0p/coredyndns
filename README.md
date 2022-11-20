@@ -1,5 +1,5 @@
 # coredyndns
-Dynamic DNS plugin for CoreDNS
+Dynamic DNS plugin for [CoreDNS](https://github.com/coredns/coredns)
 
 ## Description
 
