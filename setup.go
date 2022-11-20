@@ -43,9 +43,9 @@ func setup(c *caddy.Controller) error {
 	return nil
 }
 
-func parse(c *caddy.Controller) (*coredyndns, error) {
+func parse(c *caddy.Controller) (coredyndns, error) {
 	var err error
-	d := &coredyndns{entries: make(map[string]dnsEntry), zones: []string{}}
+	d := coredyndns{entries: make(map[string]dnsEntry), zones: []string{}}
 
 	for c.Next() {
 		for _, z := range c.RemainingArgs() {
@@ -94,13 +94,13 @@ func parse(c *caddy.Controller) (*coredyndns, error) {
 				}
 				d.password = c.Val()
 			default:
-				return &coredyndns{}, c.Errf("unknown property '%s'", c.Val())
+				return coredyndns{}, c.Errf("unknown property '%s'", c.Val())
 			}
 		}
 	}
 	err = d.init()
 	if err != nil {
-		return nil, err
+		return coredyndns{}, err
 	}
 	return d, nil
 }
