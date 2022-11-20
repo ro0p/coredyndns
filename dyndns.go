@@ -60,15 +60,18 @@ func (d *coredyndns) init() error {
 func (d coredyndns) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r}
 	qname := state.Name()
+	zone := state.Zone
 
 	answers := []dns.RR{}
-	zone := plugin.Zones(d.zones).Matches(qname)
 
-	if zone == "" {
-		// PTR zones don't need to be specified in Origins.
-		if state.QType() != dns.TypePTR {
-			// if this doesn't match we need to fall through regardless of h.Fallthrough
-			return plugin.NextOrFailure(d.Name(), d.Next, ctx, w, r)
+	if len(d.zones) > 0 {
+		zone = plugin.Zones(d.zones).Matches(qname)
+		if zone == "" {
+			// PTR zones don't need to be specified in Origins.
+			if state.QType() != dns.TypePTR {
+				// if this doesn't match we need to fall through regardless of h.Fallthrough
+				return plugin.NextOrFailure(d.Name(), d.Next, ctx, w, r)
+			}
 		}
 	}
 	if entry, ok := d.entries[qname]; ok {
