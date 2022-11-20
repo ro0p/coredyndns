@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/plugin/pkg/log"
@@ -26,6 +27,7 @@ type coredyndns struct {
 	Next plugin.Handler
 
 	entries map[string]dnsEntry
+	m       sync.Mutex
 
 	zones       []string
 	listen      string
@@ -58,16 +60,12 @@ func (d *coredyndns) init() error {
 	return nil
 }
 
-func (d coredyndns) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
+func (d *coredyndns) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r}
 	qname := state.Name()
 
-	log.Infof("query: %s - %d", qname, state.QType())
-
 	answers := []dns.RR{}
 	zone := plugin.Zones(d.zones).Matches(qname)
-
-	log.Infof("q zone: %s", zone)
 
 	if zone == "" {
 		// PTR zones don't need to be specified in Origins.
@@ -76,11 +74,10 @@ func (d coredyndns) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.M
 			return plugin.NextOrFailure(d.Name(), d.Next, ctx, w, r)
 		}
 	}
-	log.Info("q lookup")
+	d.m.Lock()
+	defer d.m.Unlock()
 	if entry, ok := d.entries[qname]; ok {
-		log.Infof("q %s exists", qname)
 		if addr, ok := entry[state.QType()]; ok {
-			log.Info("q type exists")
 			r := new(dns.A)
 			r.Hdr = dns.RR_Header{Name: zone, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 3600}
 			r.A = addr
@@ -88,12 +85,9 @@ func (d coredyndns) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.M
 		}
 	}
 
-	log.Info("q done")
 	if len(answers) == 0 {
-		log.Info("q not found")
 		return plugin.NextOrFailure(d.Name(), d.Next, ctx, w, r)
 	}
-	log.Info("q done write")
 	m := new(dns.Msg)
 	m.SetReply(r)
 	m.Authoritative = true
@@ -106,7 +100,7 @@ func (d coredyndns) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.M
 	return dns.RcodeSuccess, nil
 }
 
-func (d coredyndns) Name() string { return "coredyndns" }
+func (d *coredyndns) Name() string { return "coredyndns" }
 
 func (d *coredyndns) OnStartup() error {
 	ln, err := reuseport.Listen("tcp", d.listen)
@@ -190,6 +184,8 @@ func (d *coredyndns) OnShutdown() error {
 }
 
 func (d *coredyndns) addDnsEntry(hostname string, address net.IP) {
+	d.m.Lock()
+	defer d.m.Unlock()
 	if _, ok := d.entries[hostname]; !ok {
 		d.entries[hostname] = make(dnsEntry)
 	}
