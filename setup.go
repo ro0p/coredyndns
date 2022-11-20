@@ -6,6 +6,7 @@ import (
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
+	clog "github.com/coredns/coredns/plugin/pkg/log"
 	"github.com/miekg/dns"
 )
 
@@ -17,8 +18,9 @@ coredyndns [zones...] {
 	username <username>
 	password <password>
 }
-
 */
+
+var log = clog.NewWithPlugin("coredyndns")
 
 func init() { plugin.Register("coredyndns", setup) }
 
@@ -96,7 +98,11 @@ func parse(c *caddy.Controller) (*coredyndns, error) {
 			}
 		}
 	}
-	return d, d.init()
+	err = d.init()
+	if err != nil {
+		return nil, err
+	}
+	return d, nil
 }
 
 func parsePem(c *caddy.Controller) ([]byte, error) {
