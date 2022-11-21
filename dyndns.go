@@ -162,6 +162,8 @@ func (d *coredyndns) OnStartup() error {
 		}
 		log.Infof("dyndns update: %s - %s", hostname, address.String())
 		d.addDnsEntry(dns.Fqdn(hostname), address)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	go func() { _ = http.Serve(d.ln, d.mux) }()
