@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -120,51 +121,8 @@ func (d *coredyndns) OnStartup() error {
 	}
 	d.mux = http.NewServeMux()
 	d.nlSetup = true
-	d.mux.HandleFunc("/update", func(w http.ResponseWriter, r *http.Request) {
-		if d.username != "" {
-			u, p, ok := r.BasicAuth()
-			if !ok {
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
-				return
-			}
-			if (d.username != u) || (d.password != p) {
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
-				return
-			}
-		}
-		ip, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			http.Error(w, "missing hostname", http.StatusBadRequest)
-			return
-		}
-		hostname := r.URL.Query().Get("hostname")
-		if hostname == "" {
-			http.Error(w, "missing hostname", http.StatusBadRequest)
-			return
-		}
-		f := strings.Split(hostname, ".")
-		zone := strings.Join(f[1:], ".")
-		if len(d.zones) > 0 {
-			if !slices.Contains(d.zones, dns.Fqdn(zone)) {
-				http.Error(w, "invalid zone", http.StatusBadRequest)
-				return
-			}
-		}
-		myip := r.URL.Query().Get("myip")
-		if myip != "" {
-			ip = myip
-		}
-
-		address := net.ParseIP(ip)
-		if address == nil {
-			http.Error(w, "invalid ip address", http.StatusBadRequest)
-			return
-		}
-		log.Infof("dyndns update: %s - %s", hostname, address.String())
-		d.addDnsEntry(dns.Fqdn(hostname), address)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("OK"))
-	})
+	d.mux.HandleFunc("/update", d.dyndnsHandler)
+	d.mux.HandleFunc("/nic/update", d.dyndnsHandler)
 
 	go func() { _ = http.Serve(d.ln, d.mux) }()
 
@@ -180,13 +138,71 @@ func (d *coredyndns) OnShutdown() error {
 	return nil
 }
 
-func (d *coredyndns) addDnsEntry(hostname string, address net.IP) {
+func (d *coredyndns) addDnsEntry(hostname string, address net.IP) bool {
 	if _, ok := d.entries[hostname]; !ok {
 		d.entries[hostname] = make(dnsEntry)
 	}
+	newAddress := true
 	if address.To4() == nil {
+		if a, ok := d.entries[hostname][dns.TypeAAAA]; ok && a.Equal(address) {
+			newAddress = false
+		}
 		d.entries[hostname][dns.TypeAAAA] = address
 	} else {
+		if a, ok := d.entries[hostname][dns.TypeA]; ok && a.Equal(address) {
+			newAddress = false
+		}
 		d.entries[hostname][dns.TypeA] = address
 	}
+	return newAddress
+}
+
+func (d *coredyndns) dyndnsHandler(w http.ResponseWriter, r *http.Request) {
+	if d.username != "" {
+		u, p, ok := r.BasicAuth()
+		if !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if (d.username != u) || (d.password != p) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+	}
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		http.Error(w, "missing hostname", http.StatusBadRequest)
+		return
+	}
+	hostname := r.URL.Query().Get("hostname")
+	if hostname == "" {
+		http.Error(w, "missing hostname", http.StatusBadRequest)
+		return
+	}
+	f := strings.Split(hostname, ".")
+	zone := strings.Join(f[1:], ".")
+	if len(d.zones) > 0 {
+		if !slices.Contains(d.zones, dns.Fqdn(zone)) {
+			http.Error(w, "invalid zone", http.StatusBadRequest)
+			return
+		}
+	}
+	myip := r.URL.Query().Get("myip")
+	if myip != "" {
+		ip = myip
+	}
+
+	address := net.ParseIP(ip)
+	if address == nil {
+		http.Error(w, "invalid ip address", http.StatusBadRequest)
+		return
+	}
+	log.Infof("dyndns update: %s - %s", hostname, address.String())
+	updated := d.addDnsEntry(dns.Fqdn(hostname), address)
+	result := fmt.Sprintf("good %s", address.String())
+	if !updated {
+		result = fmt.Sprintf("nochg %s", address.String())
+	}
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(result))
 }
