@@ -197,10 +197,12 @@ func (d *coredyndns) dyndnsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid ip address", http.StatusBadRequest)
 		return
 	}
-	log.Infof("dyndns update: %s - %s", hostname, address.String())
 	updated := d.addDnsEntry(dns.Fqdn(hostname), address)
-	result := fmt.Sprintf("good %s", address.String())
-	if !updated {
+	var result string
+	if updated {
+		result = fmt.Sprintf("good %s", address.String())
+		log.Infof("dyndns update: %s - %s", hostname, address.String())
+	} else {
 		result = fmt.Sprintf("nochg %s", address.String())
 	}
 	w.WriteHeader(http.StatusOK)
