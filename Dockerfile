@@ -5,8 +5,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get upgrade -y && apt-get install ca-certificates
 RUN git clone https://github.com/coredns/coredns && \
     cd /build/coredns && sed -i '/^hosts:hosts/i coredyndns:github.com/ro0p/coredyndns' plugin.cfg
-RUN cd /build/coredns && go get -u ./... && go mod tidy
-RUN cd /build/coredns && go get github.com/ro0p/coredyndns && go mod tidy
+RUN cd /build/coredns && go get -u ./...
+RUN cd /build/coredns && go get github.com/ro0p/coredyndns
 RUN cd /build/coredns && go generate && go build && make
 
 FROM scratch
