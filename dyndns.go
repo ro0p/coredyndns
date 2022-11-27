@@ -48,7 +48,7 @@ type responseWriter struct {
 }
 
 func (r *responseWriter) WriteMsg(res *dns.Msg) error {
-	fmt.Printf("resp: %+v\n", res.Answer)
+	fmt.Printf("resp: %+v\n", *res)
 	switch r.state.QType() {
 	case dns.TypeA:
 		rr := res.Answer[0].(*dns.A)
@@ -61,6 +61,7 @@ func (r *responseWriter) WriteMsg(res *dns.Msg) error {
 		res.Answer[0] = rr
 		res.Question[0].Name = r.state.Name()
 	}
+	fmt.Printf("send resp: %+v\n", *res)
 	return r.ResponseWriter.WriteMsg(res)
 }
 
@@ -91,7 +92,7 @@ func (d coredyndns) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.M
 	state := request.Request{W: w, Req: r}
 	qname := state.Name()
 	qtype := state.QType()
-
+	fmt.Printf("req: %+v\n", *r)
 	zone := plugin.Zones(d.zones).Matches(qname)
 	if zone != "" && (qtype == dns.TypeA || qtype == dns.TypeAAAA) {
 		if entry, ok := d.entries[qname]; ok {
