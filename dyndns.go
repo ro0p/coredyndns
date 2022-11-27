@@ -41,6 +41,33 @@ type coredyndns struct {
 	nlSetup bool
 }
 
+type responseWriter struct {
+	dns.ResponseWriter
+	state request.Request
+	addr  net.IP
+}
+
+func (r *responseWriter) WriteMsg(res *dns.Msg) error {
+	fmt.Printf("resp: %+v\n", res.Answer)
+	switch r.state.QType() {
+	case dns.TypeA:
+		rr := res.Answer[0].(*dns.A)
+		rr.A = r.addr
+		res.Answer[0] = rr
+	case dns.TypeAAAA:
+		rr := res.Answer[0].(*dns.AAAA)
+		rr.AAAA = r.addr
+		res.Answer[0] = rr
+	}
+	return r.ResponseWriter.WriteMsg(res)
+}
+
+func (r *responseWriter) Write(buf []byte) (int, error) {
+	log.Warning("ResponseHeaderWriter called with Write: not able to capture response")
+	n, err := r.ResponseWriter.Write(buf)
+	return n, err
+}
+
 func (d *coredyndns) init() error {
 	if d.listen == "" {
 		d.listen = ":9080"
@@ -61,39 +88,19 @@ func (d *coredyndns) init() error {
 func (d coredyndns) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r}
 	qname := state.Name()
-
-	answers := []dns.RR{}
+	qtype := state.QType()
 
 	zone := plugin.Zones(d.zones).Matches(qname)
-	if zone == "" {
-		// PTR zones don't need to be specified in Origins.
-		if state.QType() != dns.TypePTR {
-			// if this doesn't match we need to fall through regardless of h.Fallthrough
-			return plugin.NextOrFailure(d.Name(), d.Next, ctx, w, r)
+	if zone != "" && (qtype == dns.TypeA || qtype == dns.TypeAAAA) {
+		if entry, ok := d.entries[qname]; ok {
+			if addr, ok := entry[qtype]; ok {
+				wr := responseWriter{ResponseWriter: w, state: state, addr: addr}
+				r.Question[0].Name = zone
+				return plugin.NextOrFailure(d.Name(), d.Next, ctx, &wr, r)
+			}
 		}
 	}
-	if entry, ok := d.entries[qname]; ok {
-		if addr, ok := entry[state.QType()]; ok {
-			r := new(dns.A)
-			r.Hdr = dns.RR_Header{Name: zone, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 3600}
-			r.A = addr
-			answers = append(answers, r)
-		}
-	}
-
-	if len(answers) == 0 {
-		return plugin.NextOrFailure(d.Name(), d.Next, ctx, w, r)
-	}
-	m := new(dns.Msg)
-	m.SetReply(r)
-	m.Authoritative = true
-	m.Answer = answers
-
-	err := w.WriteMsg(m)
-	if err != nil {
-		return dns.RcodeServerFailure, err
-	}
-	return dns.RcodeSuccess, nil
+	return plugin.NextOrFailure(d.Name(), d.Next, ctx, w, r)
 }
 
 func (d coredyndns) Name() string { return "coredyndns" }
