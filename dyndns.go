@@ -54,10 +54,12 @@ func (r *responseWriter) WriteMsg(res *dns.Msg) error {
 		rr := res.Answer[0].(*dns.A)
 		rr.A = r.addr
 		res.Answer[0] = rr
+		res.Question[0].Name = r.state.Name()
 	case dns.TypeAAAA:
 		rr := res.Answer[0].(*dns.AAAA)
 		rr.AAAA = r.addr
 		res.Answer[0] = rr
+		res.Question[0].Name = r.state.Name()
 	}
 	return r.ResponseWriter.WriteMsg(res)
 }
