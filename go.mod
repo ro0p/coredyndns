@@ -1,6 +1,6 @@
 module github.com/ro0p/coredyndns
 
-go 1.20
+go 1.21.3
 
 require (
 	github.com/coredns/caddy v1.1.1
