@@ -1,4 +1,4 @@
-FROM golang:1.20 AS build
+FROM golang:1.21.3 AS build
 WORKDIR /build
 ENV DEBIAN_FRONTEND=noninteractive
 
